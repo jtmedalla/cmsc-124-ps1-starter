@@ -69,11 +69,11 @@ dt_status dt_int_sub(long long a, long long b, long long *out)
     // guard conditions
 
     // b == LLONG_MIN
-    if (b == LLONG_MIN)
+    if ((b == LLONG_MIN) || (a == LLONG_MIN))
         return DT_ERR_OVERFLOW;
 
     // (-a) - b overflow
-    if ((a < 0) && (b < LLONG_MIN + a))
+    if ((a < 0) && (b < LLONG_MIN - a))
         return DT_ERR_OVERFLOW;
 
     return dt_int_add(a, -b, out);
