@@ -74,8 +74,8 @@ dt_status dt_int_sub(long long a, long long b, long long *out)
         return DT_OK;
     }
 
-    if ((b == LLONG_MIN) && (a == -1)) {
-        *out = LLONG_MAX;
+    if ((b == LLONG_MIN) && (a <= -1)) {
+        *out = a - b;
         return DT_OK;
     }
 
@@ -121,8 +121,8 @@ dt_status dt_int_mul(long long a, long long b, long long *out)
     // check that the multiplication does not overflow
     if (((a > 0) && (b > 0) && (a > LLONG_MAX / b)) ||
         ((a < 0) && (b > 0) && (a < LLONG_MIN / b)) ||
-        ((a > 0) && (b < 0) && (b < LLONG_MIN / a)) ||
-        ((a > 0) && (b < 0) && (a > LLONG_MAX / b))) {
+        ((a > 0) && (b < 0) && (a > LLONG_MIN / b)) ||
+        ((a < 0) && (b < 0) && (a > LLONG_MAX / b))) {
             return DT_ERR_OVERFLOW;
         }
 
