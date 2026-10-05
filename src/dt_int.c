@@ -122,7 +122,7 @@ dt_status dt_int_mul(long long a, long long b, long long *out)
     if (((a > 0) && (b > 0) && (a > LLONG_MAX / b)) ||
         ((a < 0) && (b > 0) && (a < LLONG_MIN / b)) ||
         ((a > 0) && (b < 0) && (a > LLONG_MIN / b)) ||
-        ((a < 0) && (b < 0) && (a > LLONG_MAX / b))) {
+        ((a < 0) && (b < 0) && (a < LLONG_MAX / b))) {
             return DT_ERR_OVERFLOW;
         }
 
