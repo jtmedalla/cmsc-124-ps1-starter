@@ -19,20 +19,59 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+
+#define DT_MAP_BUCKETS 16
+
+typedef struct dt_map_entry {
+    char *key;
+    dt_value value;
+    struct dt_map_entry *next;
+} dt_map_entry;
 
 struct dt_map {
-    int placeholder; /* TODO: Add the buckets and insertion-order data. */
+    dt_map_entry *buckets[DT_MAP_BUCKETS];
+    char **order;
+    size_t len;
+    size_t capacity;
+    //int placeholder; /* TODO: Add the buckets and insertion-order data. */
 };
+
+static size_t dt_map_hash(const char *key)
+{
+    uint64_t hash = 14695981039346656037ULL;
+
+    while (*key != '\0') {
+        unsigned char byte = (unsigned char)*key;
+        hash ^= byte;
+        hash *= 1099511628211ULL;
+        key++;
+    }
+
+    return (size_t)(hash % DT_MAP_BUCKETS);
+}
 
 /*
  * dt_map_new builds an empty map. It returns NULL after an allocation failure.
  */
 dt_map *dt_map_new(void)
 {
+    dt_map *m = malloc(sizeof(dt_map));
+
+    if (m == NULL)
+        return NULL;
+
+    for (size_t i=0; i < DT_MAP_BUCKETS; i++)
+        m->buckets[i] = NULL;
+
+    m->order = NULL;
+    m->len = 0;
+    m->capacity = 0;
+
+    return m;
     /* TODO: Return an allocated empty map. Return NULL after an allocation failure.
        dt_map_new()  -> a map whose dt_map_len is 0
        cases/normal/map_basics.case */
-    return NULL;
 }
 
 /*
@@ -41,12 +80,27 @@ dt_map *dt_map_new(void)
  */
 void dt_map_free(dt_map *m)
 {
+    if (m == NULL)
+        return;
+
+       for (size_t i = 0; i < DT_MAP_BUCKETS; i++) {
+        dt_map_entry *cur = m->buckets[i];
+
+        while (cur != NULL) {
+            dt_map_entry *next = cur->next;
+            free(cur->key);
+            free(cur);
+            cur = next;
+        }
+       }
+    
+    free(m->order);
+    free(m);
     /* TODO: Release each entry, copied key, order array, and map.
        Preserve the values. The environment owns them.
        a map holding a string value  -> the nodes and keys go, the string stays
        dt_map_free(NULL)             -> returns, having done nothing
        cases/cleanup/map_churn.case */
-    (void)m;
 }
 
 /*
@@ -60,8 +114,7 @@ size_t dt_map_len(const dt_map *m)
        after put beta again:          dt_map_len(m) -> 3, still
        after del alpha:               dt_map_len(m) -> 2
        cases/normal/map_basics.case */
-    (void)m;
-    return 0;
+    return m->len;
 }
 
 /*
@@ -72,6 +125,64 @@ size_t dt_map_len(const dt_map *m)
  */
 dt_status dt_map_put(dt_map *m, const char *key, dt_value v)
 {
+    size_t bucket = dt_map_hash(key);
+    dt_map_entry *cur = m->buckets[bucket];
+
+    while (cur != NULL) {
+        if (strcmp(cur->key, key) == 0) {
+            cur->value = v;
+            return DT_OK;
+        }
+
+        cur = cur->next;
+    }
+
+    dt_map_entry *entry = malloc(sizeof(dt_map_entry));
+
+    if (entry == NULL)
+        return DT_ERR_CAPACITY;
+
+    entry->key = malloc(strlen(key) + 1);
+
+    if (entry->key == NULL) {
+        free(entry);
+        return DT_ERR_CAPACITY;
+    }
+
+    strcpy(entry->key, key);
+    entry->value = v;
+    entry->next = NULL;
+
+        if (m->len == m->capacity) {
+            size_t new_capacity;
+
+            if (m->capacity == 0) {
+                new_capacity = 4;
+            } else {
+                new_capacity = m->capacity * 2;
+            }
+
+            char **new_order = realloc(
+                m->order,
+                new_capacity * sizeof(char *)
+            );
+
+        if (new_order == NULL) {
+            free(entry->key);
+            free(entry);
+            return DT_ERR_CAPACITY;
+        }
+
+        m->order = new_order;
+        m->capacity = new_capacity;
+    }
+
+    entry->next = m->buckets[bucket];
+    m->buckets[bucket] = entry;
+
+    m->order[m->len] = entry->key;
+    m->len++;
+
     /* TODO: Replace the value for an existing key.
        Add a new entry for a new key. Copy each new key.
        Hash the key. Select its bucket. Search the bucket chain.
@@ -80,10 +191,8 @@ dt_status dt_map_put(dt_map *m, const char *key, dt_value v)
        put "beta" -> 22 on that map       -> DT_OK, same position, new value
        an allocation failure              -> DT_ERR_CAPACITY, map unchanged
        cases/normal/map_basics.case */
-    (void)m;
-    (void)key;
-    (void)v;
-    return DT_ERR_CAPACITY;
+
+    return DT_OK;
 }
 
 /*
@@ -93,15 +202,23 @@ dt_status dt_map_put(dt_map *m, const char *key, dt_value v)
  */
 dt_status dt_map_get(const dt_map *m, const char *key, dt_value *out)
 {
+    size_t bucket = dt_map_hash(key);
+    dt_map_entry *cur = m->buckets[bucket];
+
+    while (cur != NULL) {
+        if (strcmp(cur->key, key) == 0) {
+            *out = cur->value;
+            return DT_OK;
+        }
+
+        cur = cur->next;
+    }
     /* TODO: Return DT_ERR_KEY when the key is absent.
        Preserve *out after this error. A nil value can be present.
        after put "beta" -> 22:
          dt_map_get(m, "beta", &out)   -> DT_OK, *out is the integer 22
          dt_map_get(m, "ghost", &out)  -> DT_ERR_KEY, *out untouched
        cases/normal/map_basics.case, cases/boundary/map_missing_key.case */
-    (void)m;
-    (void)key;
-    (void)out;
     return DT_ERR_KEY;
 }
 
@@ -111,6 +228,41 @@ dt_status dt_map_get(const dt_map *m, const char *key, dt_value *out)
  */
 dt_status dt_map_remove(dt_map *m, const char *key)
 {
+    size_t bucket = dt_map_hash(key);
+    dt_map_entry *cur = m->buckets[bucket];
+    dt_map_entry *prev = NULL;
+
+    while (cur != NULL) {
+        if (strcmp(cur->key, key) == 0)
+            break;
+
+        prev = cur;
+        cur = cur->next;  
+    }
+
+    if (cur == NULL)
+        return DT_ERR_KEY;
+
+    if (prev == NULL)
+        m->buckets[bucket] = cur->next;
+    else
+        prev->next = cur->next;
+
+    for (size_t i = 0; i < m->len; i++) {
+        if (strcmp(m->order[i], key) == 0) {
+            for (size_t j = i; j + 1 < m->len; j++)
+                m->order[j] = m->order[j + 1];
+
+            break;
+        }
+    }
+
+    m->len--;
+    
+    free(cur->key);
+    free(cur);
+
+    return DT_OK;
     /* TODO: Remove the entry from its bucket and insertion position.
        Release the copied key. Return DT_ERR_KEY when the key is absent.
        a map holding alpha, beta, gamma:
@@ -118,9 +270,6 @@ dt_status dt_map_remove(dt_map *m, const char *key)
          dt_map_remove(m, "ghost")  -> DT_ERR_KEY, nothing changes
        reinserting "alpha" appends it after "gamma"
        cases/normal/map_basics.case, cases/boundary/map_remove_missing_key.case */
-    (void)m;
-    (void)key;
-    return DT_ERR_KEY;
 }
 
 /*
@@ -129,6 +278,12 @@ dt_status dt_map_remove(dt_map *m, const char *key)
  */
 dt_status dt_map_key_at(const dt_map *m, size_t index, const char **out)
 {
+    if (index >= m->len)
+        return DT_ERR_RANGE;
+
+    *out = m->order[index];
+    
+    return DT_OK;
     /* TODO: Write the key at the specified insertion position to *out.
        Return DT_ERR_RANGE for an invalid position. Preserve *out after this error.
        The printer uses this order.
@@ -136,8 +291,4 @@ dt_status dt_map_key_at(const dt_map *m, size_t index, const char **out)
          dt_map_key_at(m, 0, &out)  -> DT_OK, *out = "alpha"
          dt_map_key_at(m, 3, &out)  -> DT_ERR_RANGE, *out untouched
        cases/normal/map_basics.case */
-    (void)m;
-    (void)index;
-    (void)out;
-    return DT_ERR_RANGE;
 }
