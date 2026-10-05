@@ -73,7 +73,7 @@ dt_status dt_int_sub(long long a, long long b, long long *out)
         return DT_ERR_OVERFLOW;
 
     // (-a) - b overflow
-    if ((a < 0) && (b < LLONG_MIN - a))
+    if ((a < 0) && (-b < LLONG_MIN - a))
         return DT_ERR_OVERFLOW;
 
     return dt_int_add(a, -b, out);
@@ -107,25 +107,16 @@ dt_status dt_int_mul(long long a, long long b, long long *out)
         return DT_ERR_OVERFLOW;
     }
 
-    // a * b = a + a, b times
-    dt_status dt_stat;
-
-    while (b != 0) {
-        if (b < 0) {
-            a = -a;
-            b = -b;
-            dt_stat = dt_int_add(*out, a, out);
-        } else
-            dt_stat = dt_int_add(*out, a, out);
-
-        if (dt_stat == DT_ERR_OVERFLOW) {
-            break;
+    // check that the multiplication does not overflow
+    if (((a > 0) && (b > 0) && (a > LLONG_MAX / b)) ||
+        ((a < 0) && (b > 0) && (a < LLONG_MIN / b)) ||
+        ((a > 0) && (b < 0) && (b < LLONG_MIN / a)) ||
+        ((a > 0) && (b < 0) && (a > LLONG_MAX / b))) {
+            return DT_ERR_OVERFLOW;
         }
 
-        if (b < 0) b++;
+    *out = a * b;
+    
 
-        if (b > 0) b--;
-    }
-
-    return dt_stat;
+    return DT_OK;
 }
