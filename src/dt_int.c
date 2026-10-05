@@ -68,14 +68,25 @@ dt_status dt_int_sub(long long a, long long b, long long *out)
 
     // guard conditions
 
-    // b == LLONG_MIN
-    if (b == LLONG_MIN) 
-        return DT_ERR_OVERFLOW;
+    // handle specific edge cases for if b == LLONG_MIN
+    if ((b == LLONG_MIN) && (a == LLONG_MIN)) {
+        *out = 0;
+        return DT_OK;
+    }
+
+    if ((b == LLONG_MIN) && (a == -1)) {
+        *out = LLONG_MAX;
+        return DT_OK;
+    }
+
+    // handle if b == LLONG_MIN but a does not match edge cases
+    if (b == LLONG_MIN) return DT_ERR_OVERFLOW;
 
     // (-a) - b overflow
     if ((a < 0) && (-b < LLONG_MIN - a))
         return DT_ERR_OVERFLOW;
 
+    // a - b = a + (-b)
     return dt_int_add(a, -b, out);
 }
 
@@ -102,16 +113,16 @@ dt_status dt_int_mul(long long a, long long b, long long *out)
     }
 
     // if either a or b is LLONG_MIN and the other is a negative number
-    if (((a == LLONG_MIN) || (b == LLONG_MIN)) &&
-        ((a < 0) || (b > 0))) {
+    if (((a == LLONG_MIN) && (b < 0)) ||
+        ((b == LLONG_MIN) && (a < 0))) {
         return DT_ERR_OVERFLOW;
     }
 
     // check that the multiplication does not overflow
-    if (((a > 0) && (b > 0) && (a >= LLONG_MAX / b)) ||
-        ((a < 0) && (b > 0) && (a <= LLONG_MIN / b)) ||
-        ((a > 0) && (b < 0) && (b <= LLONG_MIN / a)) ||
-        ((a > 0) && (b < 0) && (a >= LLONG_MAX / b))) {
+    if (((a > 0) && (b > 0) && (a > LLONG_MAX / b)) ||
+        ((a < 0) && (b > 0) && (a < LLONG_MIN / b)) ||
+        ((a > 0) && (b < 0) && (b < LLONG_MIN / a)) ||
+        ((a > 0) && (b < 0) && (a > LLONG_MAX / b))) {
             return DT_ERR_OVERFLOW;
         }
 
