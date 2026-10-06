@@ -26,6 +26,24 @@ struct dt_array {
     long long lower_bound;
 };
 
+dt_status dt_array_bounds_check(long long lower_bound, size_t length, long long index, long long *offset) {
+    long long upper_bound;
+
+    // reject if index < lower bound
+    if (index < lower_bound) return DT_ERR_RANGE;
+
+    // reject if index > upper bound
+    if (dt_int_add(lower_bound, length, &upper_bound) == DT_ERR_OVERFLOW) 
+        return DT_ERR_RANGE;
+    if (index >= upper_bound) return DT_ERR_RANGE;
+
+    // calculate the offset distance
+    if (dt_int_sub(index, lower_bound, offset) == DT_ERR_OVERFLOW)
+        return DT_ERR_RANGE;
+
+    return DT_OK;
+}
+
 /*
  * dt_array_new builds an array of length nil elements.
  * The first index is lower_bound. A zero length creates a valid empty array.
@@ -48,7 +66,7 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
 
     // return a valid array when the length is 0
     if (length == 0) {
-        dt_array *dt_arr = malloc(sizeof *dt_arr);
+        dt_array *dt_arr = malloc(sizeof(dt_array));
 
         // check if malloc fails
         if (dt_arr == NULL) return NULL;
@@ -66,20 +84,25 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
     // reject an element block size that exceeds SIZE_MAX
     if (length > SIZE_MAX) return NULL;
 
+    // reject if size is too big for calloc
+    if (sizeof(dt_value) > (SIZE_MAX / length)) return NULL;
+
     // initialize the offset
     long long upper_bound;
     if (dt_int_add(lower_bound, length, &upper_bound) == DT_ERR_OVERFLOW) {
         return NULL;
     }
 
-    // create a new dt_array struct and allocate memory for the elements
-    dt_array *dt_arr = malloc(sizeof(*dt_arr));
-    dt_value *elements = malloc(sizeof(dt_value) * length);
+    /* 
+     * create a new dt_array struct and allocate memory for the elements
+     * check for memory leaks
+     */
+    dt_array *dt_arr = malloc(sizeof(dt_array));
+    if (dt_arr == NULL) return NULL;
 
-    // check if malloc fails
-    if (dt_arr == NULL || elements == NULL) {
+    dt_value *elements = calloc(length, sizeof(dt_value));
+    if (elements == NULL) {
         free(dt_arr);
-        free(elements);
         return NULL;
     }
 
@@ -111,7 +134,9 @@ void dt_array_free(dt_array *a)
     if (a == NULL) return;
 
     free(a->elements);
+    a->elements = NULL;
     free(a);
+    a = NULL;
 
     return;
 }
@@ -163,24 +188,15 @@ dt_status dt_array_get(const dt_array *a, long long index, dt_value *out)
        cases/boundary/array_index_below_lower.case,
        cases/boundary/array_full_range_index.case */
 
-    // guard conditions
-
-    // reject if index < lower bound
-    if (index < a->lower_bound) return DT_ERR_RANGE;
-
-    // reject if index > upper bound
-    long long upper_bound;
-    if (dt_int_add(a->lower_bound, a->length, &upper_bound) == DT_ERR_OVERFLOW) 
-        return DT_ERR_RANGE;
-    if (index >= upper_bound) return DT_ERR_RANGE;
-
-    // calculate the offset distance
+    // guard condition
     long long offset;
-    if (dt_int_sub(index, a->lower_bound, &offset) == DT_ERR_OVERFLOW)
+
+    // check array bounds, return error if out of bounds
+    if (dt_array_bounds_check(a->lower_bound, a->length, index, &offset) == DT_ERR_RANGE)
         return DT_ERR_RANGE;
-        
 
     *out = a->elements[offset];
+
     return DT_OK;
 }
 
@@ -198,20 +214,12 @@ dt_status dt_array_set(dt_array *a, long long index, dt_value v)
          dt_array_set(a,  2, dt_value_int(10))  -> DT_ERR_RANGE, nothing changes
        cases/normal/array_basics.case, cases/boundary/array_negative_lower_bound.case */
 
-    // guard conditions
+    // guard condition
 
-    // reject if index < lower bound
-    if (index < a->lower_bound) return DT_ERR_RANGE;
-
-    // reject if index > upper bound
-    long long upper_bound;
-    if (dt_int_add(a->lower_bound, a->length, &upper_bound) == DT_ERR_OVERFLOW) 
-        return DT_ERR_RANGE;
-    if (index >= upper_bound) return DT_ERR_RANGE;
-
-    // calculate the offset distance
     long long offset;
-    if (dt_int_sub(index, a->lower_bound, &offset) == DT_ERR_OVERFLOW)
+
+    // check array bounds, return error if out of bounds
+    if (dt_array_bounds_check(a->lower_bound, a->length, index, &offset) == DT_ERR_RANGE)
         return DT_ERR_RANGE;
 
     a->elements[offset] = v;
