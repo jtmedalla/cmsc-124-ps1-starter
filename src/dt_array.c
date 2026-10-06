@@ -83,7 +83,9 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
 
     // reject an element block size that exceeds SIZE_MAX
     if (length > SIZE_MAX) return NULL;
-    if (sizeof(dt_value) > (ULONG_MAX / length)) return NULL;
+
+    // reject if size is too big for calloc
+    if (sizeof(dt_value) > (SIZE_MAX / length)) return NULL;
 
     // initialize the offset
     long long upper_bound;
