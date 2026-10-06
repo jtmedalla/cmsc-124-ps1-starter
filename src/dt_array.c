@@ -66,7 +66,7 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
 
     // return a valid array when the length is 0
     if (length == 0) {
-        dt_array *dt_arr = malloc(sizeof *dt_arr);
+        dt_array *dt_arr = malloc(sizeof(dt_array));
 
         // check if malloc fails
         if (dt_arr == NULL) return NULL;
