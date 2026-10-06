@@ -13,6 +13,7 @@
 #include "dt.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 struct dt_tuple {
     dt_value values[DT_TUPLE_MAX_ARITY];
@@ -33,9 +34,30 @@ dt_tuple *dt_tuple_new(const dt_value *values, size_t count)
        count 9     -> NULL, since DT_TUPLE_MAX_ARITY is 8
        cases/normal/tuple_basics.case, cases/capacity/tuple_max_arity.case,
        cases/capacity/tuple_over_arity.case */
-    (void)values;
-    (void)count;
-    return NULL;
+
+    // guard conditions
+
+    // count > max arity
+    if (count > DT_TUPLE_MAX_ARITY) return NULL;
+
+    // allocate memory and check for failure
+    dt_tuple *dt_tup = malloc(sizeof(dt_tuple));
+
+    if (dt_tup == NULL) return NULL;
+
+    // if count is 0
+    if (count == 0) {
+        dt_tup->arity = count;
+        return dt_tup;
+    }
+    
+    // fill in the values
+    for (size_t i = 0; i < count; i++) {
+        dt_tup->values[i] = values[i];
+    }
+    dt_tup->arity = count;
+
+    return dt_tup;
 }
 
 /*
@@ -48,7 +70,10 @@ void dt_tuple_free(dt_tuple *t)
        The environment owns those values. dt_array_free follows the same rule.
        a tuple holding a string  -> the tuple goes, the string stays
        dt_tuple_free(NULL)       -> returns, having done nothing */
-    (void)t;
+
+    if (t == NULL) return;
+    free(t);
+    t = NULL;
 }
 
 /*
@@ -61,8 +86,7 @@ size_t dt_tuple_arity(const dt_tuple *t)
        after `tup new pair 1 "two"`:  dt_tuple_arity(pair) -> 2
        after `tup new empty`:         dt_tuple_arity(empty) -> 0
        cases/normal/tuple_basics.case */
-    (void)t;
-    return 0;
+    return t->arity;
 }
 
 /*
@@ -76,8 +100,10 @@ dt_status dt_tuple_at(const dt_tuple *t, size_t index, dt_value *out)
          dt_tuple_at(t, 0, &out)  -> DT_OK, *out is the integer 1
          dt_tuple_at(t, 2, &out)  -> DT_ERR_RANGE, *out untouched
        cases/normal/tuple_basics.case, cases/boundary/tuple_index_past_arity.case */
-    (void)t;
-    (void)index;
-    (void)out;
-    return DT_ERR_RANGE;
+    
+    // ensure index is 0 or above but less than DT_TUPLE_MAX_ARITY
+    if (index >= t->arity) return DT_ERR_CAPACITY;
+
+    *out = t->values[index];
+    return DT_OK;
 }
