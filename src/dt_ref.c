@@ -43,8 +43,15 @@ dt_ref *dt_ref_new(dt_value v)
 
     // allocate memory. check if null
     dt_ref *ref = malloc(sizeof(*ref));
+
+    if (ref == NULL) return NULL;
+
     ref->cell = malloc(sizeof(*ref->cell));
-    if ((ref == NULL) || (ref->cell == NULL)) return NULL;
+
+    if (ref->cell == NULL) {
+        free(ref);
+        return NULL;
+    }
 
     *ref->cell = v;
     ref->released = false;
