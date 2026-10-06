@@ -2,6 +2,18 @@
 
 2. You wrote the tag check in dt_value_as_int by hand. Some languages don't let you. They make the tagged union a language construct, so the compiler writes the check for you, refuses to compile a read that skips it, and refuses to compile a set of cases that misses one. Rust's enum and match work this way, and so do ML's datatypes and Swift's enumerations with associated values. What does the C version let you do that a compiler enforcing the check wouldn't, and is any of it worth wanting?
 
+In our C implementation, dt_value uses a tag to identify what kind of value is stored. In dt_value_as_int, we have to check the tag ourselves before reading the integer value. One advantage of doing this in C is that we have more control over how the data is represented and how the checks are handled. We can decide how the errors are reported and when the checks should happen.
+
+The downside is that C does not force the programmer to perform the tag check. If we forget to check the tag or try to read the value as the wrong type, the compiler will not automatically stop us. For example, in Rust, enum and match allow the compiler to enforce the possible cases and catch certain mistakes before the program runs.
+
+We think that the extra control provided by C can be useful when we need direct control over the data representation and memory. However, for this type of data structure, we would prefer an approach where the possible cases are checked by the compiler because it provides more safety and reduces the chance of mistakes. The C version gives us more control but at the same time, it also puts more responsibility on the programmer.
+
 3. Your dt_map keeps insertion order separately from the hash buckets, which is memory spent on something no lookup uses. Argue the other side: describe a design that drops it, say what breaks, and say whether you'd ship it.
+
+Our dt_map currently uses hash buckets for lookup and a separate structure to keep track of insertion order. An alternative design would remove this separate insertion-order structure and store only the hash buckets and their entries. When a new key is added, we would only place its entry into the appropriate hash bucket. When looking up or removing a key, we would also only work with the hash buckets. This would reduce the memory used by the map and remove the extra bookkeeping needed to maintain the insertion order.
+
+However, the problem is that removing the insertion-order structure would affect dt_map_key_at. Without that structure, we could no longer guarantee that keys are returned in the order they were inserted. Instead, the order would depend on how the entries are arranged in the hash buckets which is based on their hashes rather than their insertion order. Any code that expects dt_map_key_at to follow insertion order would therefore behave differently.
+
+For this problem set, we would keep the insertion-order structure. Although removing it would save some memory and simplify the implementation, it would change the behavior provided by dt_map_key_at. We think the extra memory is reasonable because it allows the map to support insertion-order access as part of its current interface. We would only remove the structure if insertion order was no longer required by the interface.
 
 4. Compare access after release with an allocation that remains unreleased at the driver's final check. What damage can each cause in a long-running server? How does that answer change for a command-line tool that exits in a second?
