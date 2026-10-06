@@ -83,6 +83,7 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
 
     // reject an element block size that exceeds SIZE_MAX
     if (length > SIZE_MAX) return NULL;
+    if (sizeof(dt_value) > (ULONG_MAX / length)) return NULL;
 
     // initialize the offset
     long long upper_bound;
@@ -90,14 +91,16 @@ dt_array *dt_array_new(size_t length, long long lower_bound)
         return NULL;
     }
 
-    // create a new dt_array struct and allocate memory for the elements
-    dt_array *dt_arr = malloc(sizeof(*dt_arr));
-    dt_value *elements = calloc(length, sizeof(dt_value));
+    /* 
+     * create a new dt_array struct and allocate memory for the elements
+     * check for memory leaks
+     */
+    dt_array *dt_arr = malloc(sizeof(dt_array));
+    if (dt_arr == NULL) return NULL;
 
-    // check if malloc fails
-    if (dt_arr == NULL || elements == NULL) {
+    dt_value *elements = calloc(length, sizeof(dt_value));
+    if (elements == NULL) {
         free(dt_arr);
-        free(elements);
         return NULL;
     }
 
@@ -129,7 +132,9 @@ void dt_array_free(dt_array *a)
     if (a == NULL) return;
 
     free(a->elements);
+    a->elements = NULL;
     free(a);
+    a = NULL;
 
     return;
 }
