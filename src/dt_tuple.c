@@ -13,6 +13,7 @@
 #include "dt.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 struct dt_tuple {
     dt_value values[DT_TUPLE_MAX_ARITY];
@@ -39,21 +40,18 @@ dt_tuple *dt_tuple_new(const dt_value *values, size_t count)
     // count > max arity
     if (count > DT_TUPLE_MAX_ARITY) return NULL;
 
+    // allocate memory and check for failure
+    dt_tuple *dt_tup = malloc(sizeof(dt_tuple));
+
+    if (dt_tup == NULL) return NULL;
+
     // if count is 0
     if (count == 0) {
-        dt_tuple *dt_tup = malloc(sizeof(*dt_tup));
-        
-        // check if malloc fails
-        if (dt_tup == NULL) return NULL;
-
-        dt_value *values = NULL;
-
-        *dt_tup->values = *values;
         dt_tup->arity = count;
+        return dt_tup;
     }
-
-    dt_tuple *dt_tup = malloc(sizeof(*dt_tup));
     
+    // fill in the values
     for (size_t i = 0; i < count; i++) {
         dt_tup->values[i] = values[i];
     }
@@ -104,8 +102,7 @@ dt_status dt_tuple_at(const dt_tuple *t, size_t index, dt_value *out)
        cases/normal/tuple_basics.case, cases/boundary/tuple_index_past_arity.case */
     
     // ensure index is 0 or above but less than DT_TUPLE_MAX_ARITY
-    if ((index >= t->arity) || index <= 0)
-        return DT_ERR_CAPACITY;
+    if (index >= t->arity) return DT_ERR_CAPACITY;
 
     *out = t->values[index];
     return DT_OK;
